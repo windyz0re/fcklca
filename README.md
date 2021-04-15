@@ -15,6 +15,10 @@ For the requests to work, you need to disable cors. I suggest [chrome moesif-ori
 
 Just click generate and take a look at your network requests in the dev tools.
 
+## Does this really work?
+
+![ezgif-3-f88fc19343d3](https://user-images.githubusercontent.com/82541913/114861089-17f9f800-9ded-11eb-82ce-7845d64a1c91.gif)
+
 ## Why?
 
 I spent a day reversing the luca app and finding some issues. I'm not a security expert, just a student somewhere in the
