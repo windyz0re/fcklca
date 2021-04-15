@@ -4,15 +4,16 @@
 
 proof of concept that you are able to generate endless number of garbage accounts for any location
 
+The demo can be accessed on [gh pages](https://windyz0re.github.io/fcklca/) for having a proof of concept on the go.
+
 ## How to use?
 
 I am an backend guy. So I'm just not able to create a good interface or interact with browser rules.
-So just scan the QR Code of a certain location, extract the id at the end and enter it into the
-input field. For the requests to work, you need to disable cors. I suggest [chrome moesif-origin-cors-change](https://chrome.google.com/webstore/detail/moesif-origin-cors-change/digfbfaphojjndkpccljibejjbppifbc).
+But I got it working to have an QR Code Scanner with that you can scan the qr-codes yourself which extract the certain id. Or open a file, or eneter the link manually.
+
+For the requests to work, you need to disable cors. I suggest [chrome moesif-origin-cors-change](https://chrome.google.com/webstore/detail/moesif-origin-cors-change/digfbfaphojjndkpccljibejjbppifbc).
 
 Just click generate and take a look at your network requests in the dev tools.
-
-To serve this http page, open as an file or just start a python static file server `python -m http.server 8080` and open `localhost:8080`
 
 ## Why?
 
@@ -27,12 +28,18 @@ finish this for today, submit it to some news sources and scream on twitter abou
 ## TODO
 
 - [ ] handle cors stuff
-- [ ] host on gh pages
-- [ ] built-in qr code scanner
-- [ ] better interface
+- [x] host on gh pages
+- [x] built-in qr code scanner
+- [x] better interface
 - [ ] fix final issues with the data field in the checkin data
+- [ ] replace fake qr code generate with "real" possible data from faker
 
 Let us see who is faster. Fixing the bug or finishing theses TODOs.
+
+## What's missing?
+
+Sadly we **currently** cannot access the certain location vists counters anymore. But this is still a goal the get up
+and working again, so you can view your fake requests increase the visit counter.
 
 ## LICENSE
 

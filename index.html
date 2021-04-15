@@ -3,14 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <title>Title</title>
+
+    <style>
+        #qr-video {
+            max-width: 100%;
+            max-height: 50%;
+        }
+    </style>
 </head>
 <body>
-    <input type="text" placeholder="scannerId" id="i-scannerId">
-    <button onclick="createRandomVisit" id="btn-generate">Create Random Visit</button>
+    <h2>Scan QR Code</h2>
+    <video id="qr-video"></video>
+
+    <button onclick="askForCameraAndStart(); this.remove();">Start Scanner</button>
+
+    <hr>
+
+    <h2>Scan from file</h2>
+    <input type="file" id="i-qrfile">
+
+    <hr>
+
+    <small>In order to be able to use the manual checkin if the QRCode Scanner is enabled, you would need to disable the scanner temporarily.</small>
+    <button id="btn-toggleScanner">Toggle Scanner</button>
+
+    <h2>Enter Link manually</h2>
+    <input type="text" placeholder="https://app.luca-app.de/webapp/abcdabcd-abcd-abcd-abcd-abcdabcdabcdabc" id="i-scannerLink">
+    <button id="btn-checkin">Check In</button>
+
+    <hr>
+
+    <h2>Status</h2>
+    <p><b>Scanner ID: </b><span id="scannerId"></span></p>
+    <p style="color: red;" id="scanner-error"></p>
+
+    <button id="btn-generate">Generate Fake Visit</button>
+    <p><b>Generated Vists Total:</b> <span id="generatedVisits"></span></p>
 
     <script src="./libs/elliptic.min.js" type="application/javascript"></script>
     <script src="./libs/sha256.min.js" type="application/javascript"></script>
     <script src="./libs/forge.min.js" type="application/javascript"></script>
+    <script src="./libs/qr-scanner.umd.min.js" type="application/javascript"></script>
+
+    <script>
+        QrScanner.WORKER_PATH = "./libs/qr-scanner.worker.min.js";
+
+        let hasCamera = false,
+            lastState = {result: null, error: null, scannerId: null, canGenerateFakeCheckin: false, fakeVists: 0};
+
+        const iScannerLink = document.getElementById("i-scannerLink"),
+              btnCheckin = document.getElementById("btn-checkin"),
+              btnGenerate = document.getElementById("btn-generate"),
+              video = document.getElementById('qr-video'),
+              fileSelector = document.getElementById('i-qrfile'),
+              scannerError = document.getElementById('scanner-error'),
+              scannerId = document.getElementById('scannerId'),
+              toggleScanner = document.getElementById('btn-toggleScanner'),
+              generatedVisits = document.getElementById('generatedVisits');
+
+        function setCanGenerateFakeCheckin(b) {
+            lastState.canGenerateFakeCheckin = b;
+            btnGenerate.disabled = !b;
+        }
+
+        function incrementFakeVists() {
+            lastState.fakeVists += 1;
+            generatedVisits.innerText = lastState.fakeVists;
+        }
+
+        function askForCameraAndStart() {
+            const scanner = new QrScanner(video, result => {
+                reportQrCodeResult(result)
+            }, error => {
+                reportError(error)
+            });
+            QrScanner.hasCamera().then(r => hasCamera = r);
+            scanner.start();
+            window.scanner = scanner;
+        }
+
+        toggleScanner.onclick = () => {
+            if(window.scanner._active) {
+                window.scanner.stop();
+            } else {
+                window.scanner.start();
+            }
+        }
+
+        fileSelector.addEventListener('change', event => {
+            const file = fileSelector.files[0];
+            if (!file) {
+                return;
+            }
+            QrScanner.scanImage(file)
+                .then(result => reportQrCodeResult(result))
+                .catch(e => reportError(e || 'No QR code found.'));
+        });
+
+        function reportQrCodeResult(r) {
+            console.log(r)
+            lastState.error = null;
+            scannerError.innerHTML = null;
+            if(lastState.result !== r) {
+                lastState.result = r;
+                reportNewScanner(r);
+            }
+        }
+
+        function reportError(e) {
+            if(e === 'No QR code found.') return;
+            console.error(e)
+            lastState.result = null;
+            if(lastState.error !== e) {
+                lastState.error = e;
+                scannerError.innerHTML = "<b>ERROR: </b>";
+                scannerError.innerText += e;
+                setCanGenerateFakeCheckin(false);
+                scannerId.innerHTML = null;
+            }
+        }
+
+        function reportNewScanner(url) {
+            const u = new URL(url);
+            const parts = u.pathname.split("/");
+            if(parts.length < 3) {
+                return reportError("Invalid URL scanned.");
+            }
+            lastState.scannerId = parts[2];
+            scannerId.innerText = lastState.scannerId;
+            setCanGenerateFakeCheckin(true);
+        }
+
+        btnGenerate.disabled = true;
+
+        btnGenerate.onclick = () => {
+            generateFakeVisitFor(lastState.scannerId)
+        }
+
+        btnCheckin.onclick = () => {
+            reportNewScanner(iScannerLink.value)
+        }
+
+        function generateFakeVisitFor(id) {
+            fetch("https://app.luca-app.de/api/v3/scanners/" + id)
+                .then(r => {
+                    r.json().then(
+                        j => {
+                            fetch("https://app.luca-app.de/api/v3/traces/checkin", {
+                                method: "POST",
+                                headers: {
+                                    "Accept": "application/json",
+                                    "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify(buildCheckin(
+                                    {
+                                        publicKey: j.publicKey,
+                                        scannerId: j.scannerId
+                                    },
+                                    ge(makeCode())
+                                ))
+                            }).then(r => {
+                                console.log(r)
+                                incrementFakeVists();
+                            }).catch(e => {
+                                console.error(e)
+                            })
+                        }
+                    )
+                }).catch(e => {
+                    console.error(e)
+            })
+        }
+    </script>
 
     <script>
         function makeCode() {
@@ -67,39 +231,6 @@
             snakeoil += h.getRanHex(178);
             snakeoil += forge.util.bytesToHex(sha256(h.parseHexString(snakeoil))).slice(0, 8)
             return snakeoil;
-        }
-
-        const iScannerId = document.getElementById("i-scannerId"),
-              btnGenerate = document.getElementById("btn-generate");
-
-        btnGenerate.onclick = () => {
-            fetch("https://app.luca-app.de/api/v3/scanners/" + iScannerId.value)
-                .then(r => {
-                    r.json().then(
-                        j => {
-                            fetch("https://app.luca-app.de/api/v3/traces/checkin", {
-                                method: "POST",
-                                headers: {
-                                    "Accept": "application/json",
-                                    "Content-Type": "application/json",
-                                },
-                                body: JSON.stringify(buildCheckin(
-                                    {
-                                        publicKey: j.publicKey,
-                                        scannerId: j.scannerId
-                                    },
-                                    ge(makeCode())
-                                ))
-                            }).then(r => {
-                                console.log(r)
-                            }).catch(e => {
-                                console.error(e)
-                            })
-                        }
-                    )
-                }).catch(e => {
-                    console.error(e)
-            })
         }
 
         /*
