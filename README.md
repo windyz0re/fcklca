@@ -12,6 +12,8 @@ I am an backend guy. So I'm just not able to create a good interface or interact
 But I got it working to have an QR Code Scanner with that you can scan the qr-codes yourself which extract the certain id. Or open a file, or eneter the link manually.
 
 For the requests to work, you need to disable cors. I suggest [chrome moesif-origin-cors-change](https://chrome.google.com/webstore/detail/moesif-origin-cors-change/digfbfaphojjndkpccljibejjbppifbc).
+Otherwise you can now enable a CORS proxy, which allows you to bypass CORS rules (for this we use https://cors.bridged.cc/). We suggest to only use this service for demo purposes
+if you are on the go on mobile devices.
 
 Just click generate and take a look at your network requests in the dev tools.
 
@@ -31,10 +33,11 @@ finish this for today, submit it to some news sources and scream on twitter abou
 
 ## TODO
 
-- [ ] handle cors stuff
+- [x] handle cors stuff
 - [x] host on gh pages
 - [x] built-in qr code scanner
 - [x] better interface
+- [ ] qr scanner with camera
 - [ ] fix final issues with the data field in the checkin data
 - [ ] replace fake qr code generate with "real" possible data from faker
 
