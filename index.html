@@ -12,12 +12,15 @@
     </style>
 </head>
 <body>
-    <h2>Scan QR Code</h2>
+    <!--<h2>Scan QR Code</h2>
+    <p><b>NOTE: </b> This scanner still has some issues. This is currently not pssoible to be used perfectly. Instead upload a photo with a QR Code.</p>
     <video id="qr-video"></video>
 
     <button onclick="askForCameraAndStart(); this.remove();">Start Scanner</button>
 
-    <hr>
+    <hr>-->
+
+    <p><b>NOTE:</b> Scanner currently removed. Instead take a picture and upload it below.</p>
 
     <h2>Scan from file</h2>
     <input type="file" id="i-qrfile">
@@ -39,6 +42,7 @@
 
     <button id="btn-generate">Generate Fake Visit</button>
     <p><b>Generated Vists Total:</b> <span id="generatedVisits"></span></p>
+    <p><b>NOTE:</b> You need to have CORS disabled. If not, the requests will be blocked by your browser.</p>
 
     <script src="./libs/elliptic.min.js" type="application/javascript"></script>
     <script src="./libs/sha256.min.js" type="application/javascript"></script>
