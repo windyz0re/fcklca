@@ -11,6 +11,7 @@ const iScannerLink = document.getElementById("i-scannerLink"),
     fileSelector = document.getElementById('i-qrfile'),
     scannerError = document.getElementById('scanner-error'),
     scannerId = document.getElementById('scannerId'),
+    scannerName = document.getElementById('scannerName'),
     toggleScanner = document.getElementById('btn-toggleScanner'),
     generatedVisits = document.getElementById('generatedVisits'),
     btnToggleProxy = document.getElementById('btn-toggleProxy');
@@ -95,6 +96,19 @@ function reportNewScanner(url) {
     }
     lastState.scannerId = parts[2];
     scannerId.innerText = lastState.scannerId;
+
+    fetch(makeUrl("https://app.luca-app.de/api/v3/scanners/" + lastState.scannerId))
+        .then(r => {
+            r.json().then(
+                j => {
+                    scannerName.innerText = j.name
+                    generatedVisits.innerText = 0
+                    console.log(j)
+                }
+            )
+        }).catch(e => {
+        console.error(e)
+    })
     setCanGenerateFakeCheckin(true);
 }
 

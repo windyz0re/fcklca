@@ -30,14 +30,17 @@
 
     <hr>
 
-    <h2>Status</h2>
-    <p><b>Scanner ID: </b><span id="scannerId"></span></p>
+    <h2>Scanner Status</h2>
+    <table>
+        <tr><td>ID:</td><td><span id="scannerId"></span></td></tr>
+        <tr><td>Name:</td><td><span id="scannerName"></span></td></tr>
+        <tr><td>Generated Visits:</td><td><span id="generatedVisits"></span></td></tr>
+    </table>
     <p id="scanner-error"></p>
 
     <button id="btn-generate">Generate Fake Visit</button>
-    <p><b>Generated Vists Total:</b> <span id="generatedVisits"></span></p>
-    <p><b>NOTE:</b> You need to have CORS disabled. If not, the requests will be blocked by your browser.</p>
-    <p>You can toggle the CORS proxy if you wish: <button id="btn-toggleProxy">Enable CORS Proxy</button></p>
+    <button id="btn-toggleProxy">Enable CORS Proxy</button>
+    <p><b>NOTE:</b> You need to have either CORS disabled or the CORS Proxy enabled.<br />If not, the requests will be blocked by your browser.</p>
 
     <script src="./libs/elliptic.min.js" type="application/javascript"></script>
     <script src="./libs/sha256.min.js" type="application/javascript"></script>
