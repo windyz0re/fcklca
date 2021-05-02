@@ -12,6 +12,7 @@ const iScannerLink = document.getElementById("i-scannerLink"),
     scannerError = document.getElementById('scanner-error'),
     scannerId = document.getElementById('scannerId'),
     scannerName = document.getElementById('scannerName'),
+    scannerCity = document.getElementById('scannerCity'),
     toggleScanner = document.getElementById('btn-toggleScanner'),
     generatedVisits = document.getElementById('generatedVisits'),
     btnToggleProxy = document.getElementById('btn-toggleProxy');
@@ -103,12 +104,26 @@ function reportNewScanner(url) {
                 j => {
                     scannerName.innerText = j.name
                     generatedVisits.innerText = 0
-                    console.log(j)
+                    //console.log(j)
+
+                    fetch(makeUrl("https://app.luca-app.de/api/v3/locations/" + j.locationId))
+                        .then(r2 => {
+                            r2.json().then(
+                                j2 => {
+                                    //console.log(j2)
+                                    if(j2.city) {
+                                        scannerCity.innerText = j2.city
+                                    }
+                                }
+                            )
+                        }).catch(e => {
+                            console.error(e)
+                        })
                 }
             )
         }).catch(e => {
-        console.error(e)
-    })
+            console.error(e)
+        })
     setCanGenerateFakeCheckin(true);
 }
 
